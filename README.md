@@ -19,6 +19,8 @@
 
 MetalGoose is a native macOS application that provides real-time upscaling and frame generation for games and applications. Built entirely with Apple's Metal framework, it delivers a smooth, high-FPS experience similar to NVIDIA DLSS or AMD FSR, but designed specifically for macOS.
 
+DISCLAIMER: This is not ready for use and is coded by AI, a full rewrite by me with no AI is planned in the future.
+
 ## Features
 
 ### MGUP-1 Upscaling
