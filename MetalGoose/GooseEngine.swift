@@ -3,7 +3,7 @@ import AppKit
 @preconcurrency import Metal
 @preconcurrency import MetalKit
 @preconcurrency import MetalFX
-import IOSurface
+@preconcurrency import IOSurface
 import QuartzCore
 import os
 import Vision
@@ -463,7 +463,17 @@ final class GooseEngine: NSObject, ObservableObject, MTKViewDelegate, @unchecked
             _forwardFlow = nil
             _backwardFlow = nil
             _flowFrameID = 0
+            isComputing = false
+            submittedFrameID = 0
             os_unfair_lock_unlock(&lock)
+        }
+        
+        func shutdown() {
+            reset()
+            // Clear texture cache if needed
+            if let cache = textureCache {
+                CVMetalTextureCacheFlush(cache, 0)
+            }
         }
         
         private func runVisionFlow(source: CVPixelBuffer, target: CVPixelBuffer,
@@ -642,9 +652,7 @@ final class GooseEngine: NSObject, ObservableObject, MTKViewDelegate, @unchecked
     
     private func applyDisplaySync(to view: MTKView) {
         guard let layer = view.layer as? CAMetalLayer else { return }
-        if #available(macOS 10.13, *) {
-            layer.displaySyncEnabled = vsyncEnabled
-        }
+        layer.displaySyncEnabled = vsyncEnabled
         layer.presentsWithTransaction = false
     }
 
@@ -1258,6 +1266,8 @@ final class GooseEngine: NSObject, ObservableObject, MTKViewDelegate, @unchecked
             encoder.endEncoding()
             return output
         case .off:
+            // Fallback to nearest frame when frame generation is off
+            // This provides the lowest latency path
             return nil
         }
     }
@@ -1372,4 +1382,21 @@ final class GooseEngine: NSObject, ObservableObject, MTKViewDelegate, @unchecked
     }
     
     nonisolated func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+    
+    deinit {
+        // Clean up any remaining resources
+        resetProcessingState(clearFrames: true)
+        visionFlowProvider?.shutdown()
+        
+        // Clear references to break potential retain cycles
+        if let manager = windowCaptureManager {
+            manager.onFrameReceived = nil
+        }
+        
+        // Signal any waiting semaphores to prevent deadloads
+        for _ in 0..<3 {
+            inFlightSemaphore.signal()
+        }
+    }
 }
+

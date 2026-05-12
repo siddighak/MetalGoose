@@ -620,8 +620,16 @@ struct ContentView: View {
                     
                     self.hudController.updateFromGooseEngine(stats: stats, settings: self.settings)
                 }
-                self.overlayManager?.setCaptureCursorEnabled(self.settings.captureCursor)
-                self.overlayManager?.updateWindowPosition()
+                // These calls must happen on main queue
+                if Thread.isMainThread {
+                    self.overlayManager?.setCaptureCursorEnabled(self.settings.captureCursor)
+                    self.overlayManager?.updateWindowPosition()
+                } else {
+                    DispatchQueue.main.async {
+                        self.overlayManager?.setCaptureCursorEnabled(self.settings.captureCursor)
+                        self.overlayManager?.updateWindowPosition()
+                    }
+                }
             }
         }
     }
